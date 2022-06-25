@@ -169,14 +169,14 @@
     </div>
   </section>
 
-  <section class="hero teaser">
+  <!-- <section class="hero teaser">
     <div class="container is-max-desktop">
       <div class="hero-body">
         <!-- <img id="teaser" src="./static/images/cond-gen.png" height="100%"> -->
-        <!-- <video id="teaser" autoplay muted loop height="100%">
+  <!-- <video id="teaser" autoplay muted loop height="100%">
         <source src="https://homes.cs.washington.edu/~kpar/nerfies/videos/teaser.mp4"
                 type="video/mp4">
-      </video> -->
+      </video>
         <h2 class="subtitle has-text-centered">
           In Bayesian Optimization (BO), the typical acquisition function requires a probabilistic surrogate model
           (such as Gaussian Processes (GP)). In Likelihood-free Bayesian Optimization (LFBO), the surrogate model is a
@@ -184,7 +184,7 @@
         </h2>
       </div>
     </div>
-  </section>
+  </section> -->
 
 
   <section class="section">
@@ -338,23 +338,56 @@
       <div class="columns is-centered">
         <div class="column is-four-fifths">
           <div class="content">
-            <h2 class="title is-5">Acquisition functions as expected utility</h2>
+            <h2 class="title is-5">General acquisition functions from likelihood-free inference</h2>
+          </div>
+        </div>
+      </div>
+      <div class="columns is-centered">
+        <div class="column is-two-fifths">
+          <div class="content">
             <p>
               The problem with the above approach is that it only considers whether \(y\) is over the threshold
               \(\tau\), but not <b>by how much</b> it is over \(\tau\).
               Therefore, a query that is over the threshold by a massive amount is treated equally as one that is barely
-              over it. Can the classifier also take into account information that is beyond the binary indicator (over
+              over it.
+            </p>
+            <p>
+              Can the classifier also take into account information that is beyond the binary indicator (over
               the threshold or not)?
             </p>
             <p>
-              In this paper, we propose a simple solution. In the earlier case, the classifier is trained by treating
-              <b>every observation with equal weights</b>. We propose to instead reweight the "positive" queries (i.e., ones
-              that are above the threshold) by its utility value \(u(y, \tau)\).
-              When we use the utility associated with the EI acquisition function, we will reweight the queries \((x_i,
-              y_i)\) by \(\max(y_i - \tau, 0)\). Here, we place larger weights to queries with larger observation value.
-              If we have infinite data and modeling capacity, our learned classifier will converge to EI, unlike the one
-              used in BORE (which will converge to PI).
+              In this paper, we propose a simple solution.
+            <ul>
+              <li>
+                In the earlier case, the classifier is trained by treating
+                <b>every observation with equal weights</b>.
+              </li>
+              <li>
+                We propose to instead reweight the "positive" queries (i.e., ones that are above the threshold) by its utility value \(u(y, \tau)\).
+                When we use the utility associated with the EI acquisition function, we will reweight the queries
+                \((x_i, y_i)\) by \(\max(y_i - \tau, 0)\).
+              </li>
+              <li>
+                Here, we place larger weights to queries with larger observation value, which is reasonable because the
+                maxima is more likely to yield in their vincinity.
+                If we have infinite data and modeling capacity, our learned classifier will converge to EI, unlike the
+                one
+                used in BORE (which will converge to PI).
+              </li>
+            </ul>
             </p>
+          </div>
+        </div>
+        <div class="column is-two-fifths">
+          <img src="./static/images/weights.png" width="100%">
+          <p>
+            The new weights are applied only to points that are over the threshold. 
+          </p>
+        </div>
+      </div>
+      <div class="columns is-centered">
+        <div class="column is-four-fifths">
+          <div class="content">
             <p>
               After we obtain the weights, the training loss is just standard weighted logistic regression. In PyTorch,
               this is simply written as:
@@ -363,6 +396,12 @@
             <p>The reweighting can also be easily implemented in other standard machine learning frameworks like
               scikit-learn or XGBoost. Beyond the utility associated with the EI acquisition function, we can also use
               any non-negative utility function, which could be intractable with GPs.</p>
+            <p>
+              As our method is able to learn an acquisition function for any non-negative utility via likelihood-free
+              inference, we name our method Likelihood-Free Bayesian Optimization (LFBO). Like BORE, we use
+              likelihood-free inference, but unlike it, we are able to learn a general expectation-based acquisition
+              functions (instead of just density ratios).
+            </p>
           </div>
         </div>
       </div>
@@ -407,26 +446,98 @@
 
   <section class="section">
     <div class="container is-max-desktop">
-
       <div class="columns is-centered">
         <div class="column is-four-fifths">
           <div class="content">
-            <h2 class="title is-5">Experimental results</h2>
+            <h2 class="title is-5">Experimental results on real-world benchmarks</h2>
+            <p>
+              We compare our approach with a comprehensive set of state-of-the-art black-box optimization methods,
+              including BORE, Tree-structured Parzen Estimator (TPE), Sequential Model-based Algorithm Configuration
+              (SMAC), GP-based Expected Improvement and Random Search. Here, we use the utility function for EI in LFBO.
+              We also conisder three types of models for BORE and LFBO: Multi-Layer Perceptrons (MLP), Gradient-boosted
+              Trees (XGB), and Random Forests (RF).
+              We report the immediate regret (i.e., the absolute error between the global minimum of each benchmark and
+              the lowest function value observed so far) following previous work<a class="footnote">&sup1<span>We note
+                  that in this work and BORE, the actual output from the black-box function is a random value from
+                  several possible ones (simulating noise in the optimization process), whereas the global minimum
+                  considers the expectation over the values. Therefore, a negative immediate regret is possible (and we
+                  would use the corresponding neural network for deployment). The flat vertical lines in our plots mean
+                  that the average immediate regret (across all the seeds) has become negative.</span></a>.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="container is-max-desktop">
+      <div class="columns is-centered">
+        <div class="column is-four-fifths">
+          <div class="content">
+            <h3 class="title is-6">Neural network tuning</h3>
+            <p>
+              In HPOBench, we aim to find the optimal hyperparameter configurations for training a two-layer
+              feed-forward neural networks on four popular UCI datasets. The configuration space includes batch size,
+              initial learning rate, learning rate schedule, as well as layer-specific dropout rates, number of units
+              and activation functions. For each dataset, HPOBench tabulates the mean squared errors of all 62,208
+              configurations.
+            </p>
+            <img src="./static/images/hpobench.png" width="100%">
+            <h3 class="title is-6">Neural architecture search</h3>
+            <p>
+              In NAS-Bench-201, the network architecture is constructed as a stack of neural cells, each represented as
+              a directed acyclic graph (DAG), and we focus on the design of the neural cell, \textit{i.e.}, assigning an
+              operation to 6 edges of the DAG from a set of 5 operations. Similar to HPOBench, this dataset also
+              provides a lookup table that tabulates the training results of all 15,625 possible configurations for
+              three datasets.
+            </p>
+            <img src="./static/images/nasbench.png" width="100%">
+            <p>We can see that our LFBO approach consistently achieves the best result across all the datasets, except
+              on NAS-Bench-201-CIFAR-10 where the SMAC method is slightly better. Notably, with all three classifier
+              implementations (MLP, RF and XGBoost), LFBO (EI) consistently outperforms its BORE counterparts except for
+              Naval with MLP, which demonstrates the effectiveness of choosing EI as the acquisition function and the
+              value of enabling EI in the likelihood-free scenario.</p>
           </div>
         </div>
       </div>
   </section>
 
+  <section class="section">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered">
+        <div class="column is-four-fifths">
+          <div class="content">
+            <h2 class="title is-5">Experimental results on composite objective functions</h2>
+            <p>
+              Here, we consider the case of composite objective functions, where \(f(x) = -\Vert h(x) - z_\star
+              \Vert_2^2\) is based on a vector-valued black-box function \(h(x)\) and \(z_\star \in \mathbb{R}^d$\) is a
+              vector observed from the real world. Compared to standard BO approaches that do not exploit this
+              information, a grey-box BO method that explicitly models \(h\) can make a much better sampling decision.
+              In LFBO, we can easily take into account the structure of the problem in the classifier model (which we
+              call "Composite LFBO"). Composite LFBO approach performs significantly better than regular GP and LFBO,
+              while being on par with a composite GP approach.
+            </p>
+            <div class="has-text-centered">
+              <img src="./static/images/comp_bo.png" width="70%">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <section class="section" id="BibTeX">
     <div class="container is-max-desktop content">
-      <h2 class="title is-5">BibTeX</h2>
 
-      <pre><code>@article{song2022a
-  author    = {Song*, Jiaming and Yu, Lantao and Neiswanger, Willie and Ermon, Stefano},
+      <div class="columns is-centered">
+        <div class="column is-four-fifths">
+          <h2 class="title is-5">BibTeX</h2>
+          <pre><code>@article{song2022a
+  author    = {Song, Jiaming and Yu, Lantao and Neiswanger, Willie and Ermon, Stefano},
   title     = {A General Recipe for Likelihood-free Bayesian Optimization},
   journal   = {arXiv preprint arXiv:2106.06819},
   year      = {2022},
 }</code></pre>
+        </div>
+      </div>
     </div>
   </section>
 
